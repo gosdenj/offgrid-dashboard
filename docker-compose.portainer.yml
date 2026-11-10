@@ -1,0 +1,71 @@
+# The off-grid dashboard, as a Portainer stack.
+#
+#   Stacks -> Add stack -> Git repository
+#     Repository URL      https://github.com/gosdenj/offgrid-dashboard.git
+#     Repository reference refs/heads/main
+#     Compose path        docker-compose.portainer.yml
+#
+# The image comes from the GitHub Container Registry rather than from the
+# repository, because Portainer redeploys a stack with 'docker-compose up
+# -d' - there is no '--build' in it.  A stack redeploy therefore updates
+# the compose file but keeps the image it already has, so the image has to
+# be published somewhere for a new commit to reach the running container.
+#
+# The GitHub workflow (.github/workflows/docker.yml) builds and publishes
+# the image on every push, and Portainer is told to re-pull the image
+# every time it updates the stack.  Push, wait a few minutes, and the new
+# version is running.
+
+services:
+  offgrid-dashboard:
+    image: ghcr.io/gosdenj/offgrid-dashboard:latest
+    container_name: offgrid-dashboard
+    restart: unless-stopped
+
+    # The port on the host that the wall panel will use.  Change it in
+    # the stack's environment variables.
+    ports:
+      - "${OFFGRID_PORT:-8767}:8767"
+
+    volumes:
+      # The settings file - the Home Assistant address, the long-lived
+      # access token and the site's coordinates.
+      #
+      # A named volume rather than a folder on the host: it is the same
+      # everywhere, it survives a redeploy, and it does not depend on the
+      # host and the container sharing a filesystem - which they do not, if
+      # Portainer is running in a container with Docker Desktop underneath.
+      #
+      # The volume takes its ownership from the image, so the container can
+      # write to it without anybody having to chown anything.
+      - offgrid-config:/config
+
+    environment:
+      # Where the settings file is, inside the container.
+      OFFGRID_CONFIG: /config/config.json
+      # Listen on every interface inside the container, so the port mapping
+      # above can reach it.
+      OFFGRID_HOST: 0.0.0.0
+      # The port inside the container.  The host side is the mapping above.
+      OFFGRID_PORT: "8767"
+      # The container's timezone.  The dashboard's own timezone is the
+      # tz setting; this is what the OS is told.
+      TZ: "${TZ:-Europe/London}"
+
+    # The container runs as uid 1000, which owns the volume, so it can
+    # write the settings and nothing else.
+    user: "${OFFGRID_UID:-1000}:${OFFGRID_GID:-1000}"
+
+    # The dashboard is chatty for a few seconds at start, then quiet.  Cap
+    # the log so it cannot quietly fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  offgrid-config:
+    # The name is fixed, so the volume is the same one whatever the stack
+    # is called, and it is easy to find.
+    name: offgrid-config

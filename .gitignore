@@ -1,0 +1,25 @@
+# The settings file holds the Home Assistant long-lived access token in
+# plain text. It is written with 0600 permissions and must never be
+# committed.
+config.json
+
+# The Docker setup keeps the settings file in ./config, which is mounted
+# into the container. Everything in that directory is the live settings,
+# so none of it may be committed.
+config/
+
+# Machine-specific Docker settings (the port, the uid to run as).
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

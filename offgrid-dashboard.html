@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05080d">
+<title>Off-Grid Solar · Victron</title>
+<style>
+  :root{
+    --bg:#05080d; --panel:#0e141e; --panel2:#141c28; --panel3:#1a2432;
+    --line:#1f2b3b; --line2:#27374b;
+    --fg:#e9f0f8; --fg2:#c2cede; --muted:#8296ad; --dim:#5b6c81;
+    --solar:#f7b23b; --solar-hi:#ffd98a;
+    --batt:#3ddc84; --load:#38bdf8;
+    --warn:#fbbf24; --bad:#f87171; --good:#34d399;
+    --r:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#03060a;overflow:hidden;
+    font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:var(--fg);-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;
+    -webkit-tap-highlight-color:transparent}
+  #stage{position:absolute;top:0;left:0;width:800px;height:480px;transform-origin:0 0;
+    background:radial-gradient(125% 95% at 50% -25%,#0e1725 0%,var(--bg) 60%);
+    padding:8px;display:grid;grid-template-rows:30px 390px 28px;gap:8px}
+  .card{background:linear-gradient(180deg,var(--panel2) 0%,var(--panel) 100%);
+    border:1px solid var(--line);border-radius:var(--r);position:relative;overflow:hidden}
+  .card::after{content:"";position:absolute;inset:0;border-radius:var(--r);pointer-events:none;
+    background:linear-gradient(180deg,rgba(255,255,255,.045),transparent 40%)}
+
+  /* ── header ─────────────────────────────────────────── */
+  #head{display:flex;align-items:center;gap:9px}
+  .brand{display:flex;align-items:center;gap:8px}
+  .brand .mark{width:21px;height:21px;border-radius:7px;display:grid;place-items:center;flex:none;
+    background:linear-gradient(145deg,#ffc65c,#d9861b);box-shadow:0 0 16px rgba(247,178,59,.35)}
+  .brand .mark svg{width:13px;height:13px}
+  .brand h1{font-size:14.5px;font-weight:650;letter-spacing:.055em;text-transform:uppercase;line-height:1.1}
+  .brand .sub{font-size:9px;color:var(--dim);letter-spacing:.16em;text-transform:uppercase;margin-top:2px}
+  .spacer{flex:1}
+  .chip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:999px;
+    background:var(--panel3);border:1px solid var(--line2);font-size:10px;color:var(--fg2);
+    letter-spacing:.04em;white-space:nowrap}
+  .chip .k{color:var(--dim);font-size:9px;letter-spacing:.12em;text-transform:uppercase}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--dim);flex:none}
+  .dot.live{background:var(--good);box-shadow:0 0 0 3px rgba(52,211,153,.16);animation:pulse 2.2s ease-in-out infinite}
+  .dot.warn{background:var(--warn);box-shadow:0 0 0 3px rgba(251,191,36,.16);animation:pulse 1s ease-in-out infinite}
+  .dot.bad{background:var(--bad);box-shadow:0 0 0 3px rgba(248,113,113,.2);animation:pulse .8s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  #clock{font-variant-numeric:tabular-nums;font-weight:600;font-size:13.5px;letter-spacing:.02em}
+  #clock .d{font-size:9px;color:var(--dim);font-weight:500;letter-spacing:.11em;margin-left:6px}
+
+  /* ── layout ─────────────────────────────────────────── */
+  #main{display:grid;grid-template-columns:430px 346px;gap:8px;min-height:0}
+  #left{display:grid;grid-template-rows:254px 128px;gap:8px;min-height:0}
+  #right{display:grid;grid-template-rows:214px 168px;gap:8px;min-height:0}
+
+  .ttl{position:absolute;top:9px;left:11px;right:11px;z-index:3;font-size:9.5px;letter-spacing:.15em;
+    text-transform:uppercase;color:var(--muted);font-weight:650;display:flex;gap:6px;align-items:center}
+  .ttl .r{margin-left:auto;color:var(--dim);letter-spacing:.08em;font-weight:500}
+  .ttl svg{width:11px;height:11px;opacity:.75;flex:none}
+
+  /* ── PV hero + day curve ────────────────────────────── */
+  #pvCard{display:flex;flex-direction:column;padding:26px 11px 8px}
+  .hero{display:flex;align-items:flex-start;gap:12px;height:74px}
+  .heroL{flex:none}
+  .heroL .lab{font-size:8.5px;letter-spacing:.19em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .heroL .big{font-size:46px;font-weight:700;letter-spacing:-.035em;line-height:1.02;margin-top:1px;
+    font-variant-numeric:tabular-nums;color:var(--solar-hi);text-shadow:0 0 30px rgba(247,178,59,.35)}
+  .heroL .big u{font-size:19px;text-decoration:none;font-weight:600;color:var(--solar);margin-left:4px;
+    text-shadow:none}
+  .heroL .split{font-size:9.5px;color:var(--dim);margin-top:3px;letter-spacing:.03em;white-space:nowrap}
+  .heroL .split b{color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+  .heroR{flex:1;min-width:0;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding-top:3px}
+  .hstat{min-width:0;overflow:hidden;background:rgba(255,255,255,.028);border:1px solid var(--line);
+    border-radius:8px;padding:5px 7px}
+  .hstat .k{font-size:7.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);font-weight:700;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hstat .v{font-size:15px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:1px;letter-spacing:-.02em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hstat .v em{font-style:normal;font-size:9px;color:var(--muted);font-weight:500;margin-left:2px}
+  #curveWrap{flex:1;position:relative;margin-top:4px}
+  #curveWrap svg{width:100%;height:100%;display:block}
+  .cpeak{position:absolute;right:2px;top:0;font-size:8.5px;color:var(--dim);letter-spacing:.05em}
+  .cpeak b{color:var(--solar);font-weight:650;font-variant-numeric:tabular-nums}
+
+  /* ── power flow ─────────────────────────────────────── */
+  /* the sub-labels sit close to the lower edge of the viewBox, and descenders
+     (g, y, p) need room to clear it — the box is sized so the viewBox maps
+     close to 1:1 and the text rows sit a touch higher */
+  #flowCard svg{position:absolute;inset:22px 6px 2px 6px;width:calc(100% - 12px);height:calc(100% - 24px)}
+  .flab{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;fill:var(--muted);font-weight:700}
+  .fval{font-size:13px;font-weight:700;fill:var(--fg);font-variant-numeric:tabular-nums}
+  .fsub{font-size:8px;fill:var(--dim);letter-spacing:.04em}
+
+  /* ── battery ────────────────────────────────────────── */
+  /* vertical budget (card = 214px): 24 title pad + 68 brow + 74 stats
+     + 44 SoC sparkline + 7 bottom pad = 217 */
+  #battCard{padding:24px 10px 7px;display:flex;flex-direction:column}
+  .brow{display:flex;gap:10px;align-items:flex-start;flex:none;height:68px}
+  .binfo{flex:1;min-width:0}
+  .ring{width:68px;height:68px;flex:none;margin-left:auto}
+  .ring .trk{fill:none;stroke:#1d2937;stroke-width:7.5}
+  .ring .arc{fill:none;stroke:var(--batt);stroke-width:7.5;stroke-linecap:round;
+    transform:rotate(-90deg);transform-origin:50% 50%;
+    transition:stroke-dashoffset .7s cubic-bezier(.4,0,.2,1),stroke .5s}
+  .ring .pct{font-size:19px;font-weight:700;fill:var(--fg);text-anchor:middle;font-variant-numeric:tabular-nums}
+  /* the unit rides along with the number as a tspan, so "68%" stays centred
+     whatever the value — and the % stays legible without crowding the ring */
+  .ring .pctU{font-size:11px;font-weight:600;fill:var(--muted)}
+  /* the SoC flash is a fill change on SVG text — a background flash is a no-op here */
+  .ring .pct tspan.flash{animation:flRing .7s ease-out}
+  @keyframes flRing{0%{fill:var(--solar-hi)}100%{fill:var(--fg)}}
+  .ring .cap{font-size:5.5px;fill:var(--dim);text-anchor:middle;letter-spacing:.16em;font-weight:600}
+  .bstate{display:inline-flex;align-items:center;gap:4px;font-size:8.5px;font-weight:700;letter-spacing:.13em;
+    text-transform:uppercase;padding:3px 7px;border-radius:5px;white-space:nowrap}
+  .bstate.chg{background:rgba(61,220,132,.14);color:var(--batt)}
+  .bstate.dis{background:rgba(56,189,248,.14);color:var(--load)}
+  .bstate.idle{background:rgba(247,178,59,.14);color:var(--solar)}
+  .bstate .ar{font-size:10px;line-height:1}
+  .bpow{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:3px;letter-spacing:-.025em}
+  .bpow u{font-size:12px;text-decoration:none;font-weight:600;color:var(--muted);margin-left:3px}
+  .bttg{font-size:9px;color:var(--dim);margin-top:1px;letter-spacing:.03em;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  .bgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 0;margin-top:7px;flex:none;
+    border-top:1px solid var(--line);padding-top:6px}
+  .bgrid .k{font-size:7px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:700;line-height:1.35}
+  .bgrid .v{font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.3;letter-spacing:-.01em}
+  .bgrid .v u{font-size:8.5px;text-decoration:none;color:var(--muted);font-weight:500;margin-left:2px}
+  .socbox{flex:1;position:relative;margin-top:6px;min-height:0}
+  #socSpark{position:absolute;left:0;right:0;top:12px;bottom:0}
+  #socSpark svg{width:100%;height:100%;display:block}
+  .soclab{position:absolute;left:0;top:0;font-size:7.5px;letter-spacing:.14em;line-height:1.3;
+    text-transform:uppercase;color:var(--dim);font-weight:700}
+
+  /* ── mppt cards ─────────────────────────────────────── */
+  #mpptRow{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-height:0}
+  .mppt{padding:9px 10px;display:flex;flex-direction:column}
+  .mhead{display:flex;align-items:center;gap:6px}
+  .mhead svg{width:13px;height:13px;flex:none}
+  .mhead .nm{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--fg2);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mode{margin-left:auto;font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    padding:2px 6px;border-radius:4px;white-space:nowrap}
+  .mode.bulk{background:rgba(247,178,59,.15);color:var(--solar)}
+  .mode.absorb{background:rgba(248,113,113,.16);color:#fca5a5}
+  .mode.float{background:rgba(56,189,248,.15);color:var(--load)}
+  .mode.off{background:rgba(148,163,184,.14);color:#94a3b8}
+  .mode.err{background:rgba(248,113,113,.24);color:#fecaca}
+  .mbig{margin-top:5px;display:flex;align-items:baseline;gap:4px}
+  .mbig .n{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.03em;
+    color:var(--solar-hi);line-height:1}
+  .mbig .u{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.05em}
+  .mbig .s{margin-left:auto;font-size:9px;color:var(--dim);text-align:right;line-height:1.25}
+  .mrows{margin-top:6px;border-top:1px solid var(--line);padding-top:4px;display:flex;flex-direction:column;gap:1px}
+  .mrow{display:flex;justify-content:space-between;align-items:baseline;font-size:9px;line-height:1.35}
+  .mrow .k{color:var(--dim);letter-spacing:.04em}
+  .mrow .v{font-variant-numeric:tabular-nums;font-weight:600;color:var(--fg2)}
+  .mrow .v em{font-style:normal;color:var(--dim);font-weight:500;font-size:8.5px;margin-left:1px}
+  .mrow .v.warn{color:var(--warn)}
+
+  /* ── footer strip ───────────────────────────────────── */
+  #foot{display:flex;align-items:stretch;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;overflow:hidden}
+  .fs{flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 6px;min-width:0;position:relative}
+  .fs + .fs::before{content:"";position:absolute;left:0;top:5px;bottom:5px;width:1px;background:var(--line)}
+  .fs .k{font-size:6.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:700;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fs .v{font-size:11px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:1px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .fs .v em{font-style:normal;font-size:8px;color:var(--muted);font-weight:500;margin-left:2px}
+  .fs .v.sol{color:var(--solar-hi)}
+
+  /* ── states ─────────────────────────────────────────── */
+  #banner{position:absolute;inset:0;display:none;place-items:center;background:rgba(5,8,13,.93);
+    z-index:20;flex-direction:column;gap:7px;text-align:center}
+  #banner.on{display:grid}
+  #banner .t{font-size:14px;font-weight:650;letter-spacing:.08em;text-transform:uppercase}
+  #banner .m{font-size:11px;color:var(--muted);max-width:340px;line-height:1.5}
+  .flash{animation:fl .6s ease-out;border-radius:4px}
+  @keyframes fl{0%{background:rgba(247,178,59,.35);color:#fff}100%{background:transparent}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header id="head">
+    <div class="brand">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#3a2200" stroke-width="2.4" stroke-linecap="round">
+        <circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.6M12 19.4V22M2 12h2.6M19.4 12H22M4.9 4.9l1.9 1.9M17.2 17.2l1.9 1.9M19.1 4.9l-1.9 1.9M6.8 17.2l-1.9 1.9"/></svg></span>
+      <div>
+        <h1>Off-Grid Solar</h1>
+        <div class="sub">Victron · Portsmouth</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <span class="chip" id="sunChip"><span class="dot" id="sunDot"></span><span class="k">Sun</span><span id="sunTxt">—</span></span>
+    <span class="chip" id="alrmChip" style="display:none"><span class="dot bad"></span><span id="alrmTxt">ALARM</span></span>
+    <span class="chip"><span class="dot" id="liveDot"></span><span id="liveTxt">connecting</span></span>
+    <span class="chip"><span id="clock">--:--:--<span class="d" id="cdate"></span></span></span>
+  </header>
+
+  <div id="main">
+    <div id="left">
+
+      <!-- PV hero + today's curve -->
+      <section class="card" id="pvCard">
+        <div class="ttl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></svg>
+          PV Output</div>
+        <div class="hero">
+          <div class="heroL">
+            <div class="lab">Array output now</div>
+            <div class="big"><span id="pvNow">—</span><u>W</u></div>
+            <div class="split">100|20 <b id="spM1">—</b> · BLE <b id="spM2">—</b></div>
+          </div>
+          <div class="heroR">
+            <div class="hstat"><div class="k">Peak today</div><div class="v"><span id="hPeak">—</span><em>W</em></div></div>
+            <div class="hstat"><div class="k">Yield today</div><div class="v" id="hToday">—</div></div>
+            <div class="hstat"><div class="k">Sun alt</div><div class="v"><span id="hSun">—</span><em>°</em></div></div>
+          </div>
+        </div>
+        <div id="curveWrap">
+          <svg id="curve" viewBox="0 0 408 142" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f7b23b" stop-opacity=".45"/>
+                <stop offset="100%" stop-color="#f7b23b" stop-opacity=".03"/>
+              </linearGradient>
+              <linearGradient id="lineStroke" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#c8811d"/><stop offset="70%" stop-color="#f7b23b"/>
+                <stop offset="100%" stop-color="#ffe6b0"/>
+              </linearGradient>
+              <radialGradient id="nowGlow">
+                <stop offset="0%" stop-color="#fff3d6" stop-opacity=".95"/>
+                <stop offset="45%" stop-color="#f7b23b" stop-opacity=".4"/>
+                <stop offset="100%" stop-color="#f7b23b" stop-opacity="0"/>
+              </radialGradient>
+              <linearGradient id="socFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#3ddc84" stop-opacity=".3"/>
+                <stop offset="100%" stop-color="#3ddc84" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <g id="cNight"></g>
+            <g id="cGrid"></g>
+            <path id="cArea" fill="url(#areaFill)"/>
+            <path id="cLine" fill="none" stroke="url(#lineStroke)" stroke-width="1.8" stroke-linejoin="round"/>
+            <g id="cPeakMark"></g>
+            <line id="cNowLine" stroke="#f7b23b" stroke-width="1" stroke-dasharray="2 3" opacity=".55"/>
+            <circle id="cNowGlow" r="8" fill="url(#nowGlow)" opacity="0"/>
+            <circle id="cNowDot" r="3" fill="#fff4d8" opacity="0"/>
+            <g id="cAxis"></g>
+          </svg>
+        </div>
+      </section>
+
+      <!-- power flow -->
+      <section class="card" id="flowCard">
+        <div class="ttl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2 4.5 13H11l-1 9 8.5-11H12l1-9z"/></svg>
+          Power Flow <span class="r">PV − battery = load</span></div>
+        <svg viewBox="0 0 410 104" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <symbol id="iSun" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M19.1 4.9l-1.7 1.7M6.6 17.4l-1.7 1.7"/></g></symbol>
+            <symbol id="iBatt" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+              <rect x="2" y="7" width="17" height="10" rx="2.5"/><path d="M22 10.5v3"/><path d="M10.5 9.5 8 13h3l-1.5 2.5"/></g></symbol>
+            <symbol id="iHome" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+              <path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/></g></symbol>
+            <marker id="arrS" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M0 0 10 5 0 10z" fill="#f7b23b"/></marker>
+            <marker id="arrL" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M0 0 10 5 0 10z" fill="#38bdf8"/></marker>
+          </defs>
+          <g id="flowArrows"></g>
+          <g id="flowNodes"></g>
+        </svg>
+      </section>
+    </div>
+
+    <div id="right">
+      <!-- battery -->
+      <section class="card" id="battCard">
+        <div class="ttl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round">
+          <rect x="2" y="7" width="17" height="10" rx="2.5"/><path d="M22 10.5v3"/><path d="M10.5 9.5 8 13h3l-1.5 2.5"/></svg>
+          Battery <span class="r" id="battNote">SmartShunt 500A</span></div>
+        <div class="brow">
+          <div class="binfo">
+            <span class="bstate idle" id="bState"><span class="ar">•</span><span id="bStateTxt">idle</span></span>
+            <div class="bpow"><span id="bPow">—</span><u>W</u></div>
+            <div class="bttg" id="bTtg">—</div>
+          </div>
+          <svg class="ring" viewBox="0 0 80 80">
+            <circle class="trk" cx="40" cy="40" r="33"/>
+            <circle class="arc" id="socArc" cx="40" cy="40" r="33" stroke-dasharray="207.3" stroke-dashoffset="207.3"/>
+            <text class="pct" x="40" y="40"><tspan id="socPct">—</tspan><tspan class="pctU">%</tspan></text>
+            <text class="cap" x="40" y="53">SOC</text>
+          </svg>
+        </div>
+        <div class="bgrid">
+          <div><div class="k">Voltage</div><div class="v"><span id="bV">—</span><u>V</u></div></div>
+          <div><div class="k">Current</div><div class="v"><span id="bA">—</span><u>A</u></div></div>
+          <div><div class="k">Cell temp</div><div class="v"><span id="bT">—</span><u>°C</u></div></div>
+          <div><div class="k">Humidity</div><div class="v"><span id="bH">—</span><u>%</u></div></div>
+          <div><div class="k">Ah left</div><div class="v"><span id="bAh">—</span><u>Ah</u></div></div>
+          <div><div class="k">Cycles</div><div class="v"><span id="bCy">—</span></div></div>
+        </div>
+        <div class="socbox">
+          <div class="soclab">State of charge today</div>
+          <div id="socSpark"><svg viewBox="0 0 300 24" preserveAspectRatio="none">
+            <path id="socArea" fill="url(#socFill)"/><path id="socLine" fill="none" stroke="#3ddc84" stroke-width="1.6"/>
+          </svg></div>
+        </div>
+      </section>
+
+      <!-- mppts -->
+      <div id="mpptRow">
+        <section class="card mppt" id="mppt1">
+          <div class="mhead">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f7b23b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="7" width="17" height="10" rx="2.5"/><path d="M22 10.5v3"/><path d="M10.5 9.5 8 13h3l-1.5 2.5"/></svg>
+            <span class="nm">MPPT 100|20</span>
+            <span class="mode off" id="m1Mode">—</span>
+          </div>
+          <div class="mbig">
+            <span class="n" id="m1W">—</span><span class="u">W</span>
+            <span class="s" id="m1Soc">SN —</span>
+          </div>
+          <div class="mrows">
+            <div class="mrow"><span class="k">PV volts</span><span class="v"><span id="m1V">—</span><em>V</em></span></div>
+            <div class="mrow"><span class="k">Chg amps</span><span class="v"><span id="m1A">—</span><em>A</em></span></div>
+            <div class="mrow"><span class="k">Batt volts</span><span class="v"><span id="m1BV">—</span><em>V</em></span></div>
+            <div class="mrow"><span class="k">Today</span><span class="v"><span id="m1Td">—</span><em>Wh</em></span></div>
+            <div class="mrow"><span class="k">Peak today</span><span class="v"><span id="m1Pk">—</span><em>W</em></span></div>
+            <div class="mrow"><span class="k">Lifetime</span><span class="v"><span id="m1Lt">—</span><em>kWh</em></span></div>
+          </div>        </section>
+
+        <section class="card mppt" id="mppt2">
+          <div class="mhead">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f7b23b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="7" width="17" height="10" rx="2.5"/><path d="M22 10.5v3"/><path d="M10.5 9.5 8 13h3l-1.5 2.5"/></svg>
+            <span class="nm">MPPT BLE</span>
+            <span class="mode off" id="m2Mode">—</span>
+          </div>
+          <div class="mbig">
+            <span class="n" id="m2W">—</span><span class="u">W</span>
+            <span class="s" id="m2Soc">array 2</span>
+          </div>
+          <div class="mrows">
+            <div class="mrow"><span class="k">Batt volts</span><span class="v"><span id="m2BV">—</span><em>V</em></span></div>
+            <div class="mrow"><span class="k">Chg amps</span><span class="v"><span id="m2A">—</span><em>A</em></span></div>
+            <div class="mrow"><span class="k">Today</span><span class="v"><span id="m2Td">—</span><em>Wh</em></span></div>
+            <div class="mrow"><span class="k">Peak today</span><span class="v"><span id="m2Pk">—</span><em>W</em></span></div>
+            <div class="mrow"><span class="k">Lifetime</span><span class="v"><span id="m2Lt">—</span><em>kWh</em></span></div>
+            <div class="mrow"><span class="k">Firmware</span><span class="v" id="m2Fw">—</span></div>
+          </div>        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- footer strip -->
+  <div id="foot">
+    <div class="fs"><div class="k">PV today</div><div class="v sol" id="fToday">—</div></div>
+    <div class="fs"><div class="k">Yesterday</div><div class="v" id="fYest">—</div></div>
+    <div class="fs"><div class="k">PV lifetime</div><div class="v sol" id="fLife">—</div></div>
+    <div class="fs"><div class="k">Batt in</div><div class="v" id="fIn">—</div></div>
+    <div class="fs"><div class="k">Batt out</div><div class="v" id="fOut">—</div></div>
+    <div class="fs"><div class="k">Full disch</div><div class="v" id="fFd">—</div></div>
+    <div class="fs"><div class="k">Volt range</div><div class="v" id="fVr">—</div></div>
+    <div class="fs"><div class="k">Last full</div><div class="v" id="fLfc">—</div></div>
+    <div class="fs"><div class="k">Updated</div><div class="v" id="fUpd">—</div></div>
+  </div>
+
+  <div id="banner"><div class="t" id="bnT">Connecting…</div><div class="m" id="bnM"></div></div>
+</div>
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════
+   CONFIG
+   ═══════════════════════════════════════════════════════════════
+   Everything between the CFG_START and CFG_END markers is replaced at
+   request time by the server, which reads the settings out of the
+   Docker volume.  Nothing secret is in this file: the Home Assistant
+   URL, the long-lived access token and the site coordinates all live
+   in the volume and reach the browser only at the moment the page is
+   served.  What is here is the fallback for opening the file straight
+   off the disk, with no server in front of it - which is also what the
+   ?hass= and ?token= overrides below are for.
+   ═══════════════════════════════════════════════════════════════ */
+const CFG = /*CFG_START*/{
+  hass : '',
+  token: '',
+  lat  : 0,
+  lon  : 0,                 // east-positive; the UK is negative
+  tz   : 'UTC',
+  histEveryMs : 10*60*1000,
+}/*CFG_END*/;
+try{
+  const q = new URLSearchParams(location.search);
+  if(q.get('hass'))  CFG.hass  = q.get('hass');
+  if(q.get('token')) CFG.token = q.get('token');
+  const s = localStorage.getItem('og.hass'), t = localStorage.getItem('og.token');
+  if(s) CFG.hass = s; if(t) CFG.token = t;
+}catch(e){}
+
+const E = {
+  soc      :'sensor.victron_smartshunt_500_state_of_charge',
+  volt     :'sensor.victron_smartshunt_500_battery_voltage',
+  curr     :'sensor.victron_smartshunt_500_battery_current',
+  power    :'sensor.victron_smartshunt_500_instantaneous_power',
+  ttg      :'sensor.victron_smartshunt_500_time_to_go',
+  ah       :'sensor.victron_smartshunt_500_consumed_amp_hours',
+  cycles   :'sensor.victron_smartshunt_500_number_of_charge_cycles',
+  fulldisc :'sensor.victron_smartshunt_500_number_of_full_discharges',
+  chgEnergy:'sensor.victron_smartshunt_500_amount_of_charged_energy',
+  disEnergy:'sensor.victron_smartshunt_500_amount_of_discharged_energy',
+  minV     :'sensor.victron_smartshunt_500_min_battery_voltage',
+  maxV     :'sensor.victron_smartshunt_500_max_battery_voltage',
+  alarm    :'sensor.victron_smartshunt_500_alarm_condition_active',
+  alarmWhy :'sensor.victron_smartshunt_500_alarm_reason',
+  lastFull :'sensor.victron_smartshunt_500_last_full_charge',
+  temp     :'sensor.victron_bat_temp_victron_battery_temperature',
+  humid    :'sensor.victron_bat_temp_victron_battery_humidity',
+
+  m1Power  :'sensor.victron_mppt_100_20_panel_power',
+  m1PV     :'sensor.victron_mppt_100_20_panel_voltage',
+  m1Cur    :'sensor.victron_mppt_100_20_panel_current',
+  m1BV     :'sensor.victron_mppt_100_20_battery_voltage',
+  m1Yield  :'sensor.victron_mppt_100_20_yield_today',
+  m1Yest   :'sensor.victron_mppt_100_20_yield_yesterday',
+  m1Total  :'sensor.victron_mppt_100_20_yield_total',
+  m1Mode   :'sensor.victron_mppt_100_20_charging_mode',
+  m1Track  :'sensor.victron_mppt_100_20_tracking_mode',
+  m1Error  :'sensor.victron_mppt_100_20_error',
+  m1SN     :'sensor.victron_mppt_100_20_serial_number',
+
+  m2Power  :'sensor.victron_ble_pv_power',
+  m2BV     :'sensor.victron_ble_battery_voltage',
+  m2Cur    :'sensor.victron_ble_battery_current',
+  m2Yield  :'sensor.victron_ble_yield_today',
+  m2Total  :'sensor.victron_ble_solar_energy_produced',
+  m2Mode   :'sensor.victron_ble_mppt_state',
+  m2Error  :'sensor.victron_ble_mppt_error_reason',
+  m2Fault  :'binary_sensor.victron_ble_mppt_is_in_fault_state',
+  m2HasErr :'binary_sensor.victron_ble_mppt_has_error',
+  m2Fw     :'update.victron_ble_firmware',
+};
+const LIVE_IDS = [...new Set(Object.values(E))];
+const HIST_IDS = [E.m1Power, E.m2Power, E.soc];
+
+/* which on-screen element to flash when an entity changes */
+const FLASH = {
+  [E.soc]:['socPct'], [E.power]:['bPow'], [E.volt]:['bV'], [E.curr]:['bA'],
+  [E.temp]:['bT'], [E.humid]:['bH'], [E.m1Power]:['m1W'], [E.m2Power]:['m2W'],
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════════ */
+const S = {
+  live : new Map(),          // entity_id -> {s, a, t}
+  hist : {m1:[], m2:[], soc:[]},
+  bins : [],                 // today's combined PV bins
+  yM1  : [],                 // yesterday, MPPT 100|20 array
+  yM2  : [],                 // yesterday, BLE array
+  dayStart:0, ydayStart:0,
+  peak:0, yPeak:0,
+  lastMsg:0, connected:false,
+};
+
+const $  = id => document.getElementById(id);
+const num = id => { const o = S.live.get(id); if(!o) return null;
+  if(o.s==='unknown'||o.s==='unavailable'||o.s===''||o.s==='None') return null;
+  const n = parseFloat(o.s); return Number.isFinite(n) ? n : null; };
+const str = id => { const o = S.live.get(id); return o ? o.s : null; };
+
+/* ═══════════════════════════════════════════════════════════════
+   SOLAR / TIME HELPERS  (NOAA)
+   ═══════════════════════════════════════════════════════════════ */
+const RAD = Math.PI/180;
+function tzParts(ts, tz){
+  const p = new Intl.DateTimeFormat('en-GB',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date(ts));
+  const o = {}; p.forEach(x => o[x.type] = x.value);
+  if(o.hour === '24') o.hour = '00';
+  return o;
+}
+function tzOffsetMs(ts, tz){
+  const p = tzParts(ts, tz);
+  const asUTC = Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);
+  return asUTC - Math.floor(ts/1000)*1000;
+}
+function localMidnight(ts, tz){
+  const p = tzParts(ts, tz);
+  const base = Date.UTC(+p.year,+p.month-1,+p.day);
+  let t = base - tzOffsetMs(base, tz);
+  t = base - tzOffsetMs(t, tz);
+  return t/1000;
+}
+function solarTerms(ts, lat, lonE){
+  const d = new Date(ts);
+  const doy = Math.floor((ts - Date.UTC(d.getUTCFullYear(),0,1))/86400000) + 1;
+  const hour = d.getUTCHours() + d.getUTCMinutes()/60 + d.getUTCSeconds()/3600;
+  const g = 2*Math.PI/365 * (doy - 1 + (hour - 12)/24);
+  const eqt = 229.18*(0.000075 + 0.001868*Math.cos(g) - 0.032077*Math.sin(g)
+            - 0.014615*Math.cos(2*g) - 0.040849*Math.sin(2*g));
+  const dec = 0.006918 - 0.399912*Math.cos(g) + 0.070257*Math.sin(g) - 0.006758*Math.cos(2*g)
+            + 0.000907*Math.sin(2*g) - 0.002697*Math.cos(3*g) + 0.00148*Math.sin(3*g);
+  const latR = lat*RAD;
+  const cosH = (Math.cos(90.833*RAD) - Math.sin(latR)*Math.sin(dec))/(Math.cos(latR)*Math.cos(dec));
+  const ha = Math.acos(Math.max(-1,Math.min(1,cosH)))/RAD;      // sunrise/sunset hour angle
+  return {eqt, dec, ha, noonUTC:720-4*lonE-eqt, riseUTC:720-4*(lonE+ha)-eqt, setUTC:720-4*(lonE-ha)-eqt};
+}
+/* Sunrise / sunset for the local calendar day, as epoch seconds.
+   riseUTC/setUTC are minutes after UTC midnight, so the UTC date of the
+   local day is used as the base (London's offset is at most +1 h, and the
+   sun always crosses the horizon well after UTC midnight). */
+function sunTimes(ts){
+  const p = tzParts(ts, CFG.tz);
+  const base = Date.UTC(+p.year,+p.month-1,+p.day);
+  const t = solarTerms(base + 12*3600*1000, CFG.lat, CFG.lon);
+  return {rise:(base + t.riseUTC*60000)/1000, set:(base + t.setUTC*60000)/1000,
+          noon:(base + t.noonUTC*60000)/1000};
+}
+function sunElevation(ts){
+  const d = new Date(ts);
+  const t = solarTerms(ts, CFG.lat, CFG.lon);
+  const utcMin = d.getUTCHours()*60 + d.getUTCMinutes() + d.getUTCSeconds()/60;
+  const tst = utcMin + t.eqt + 4*CFG.lon;
+  const ha = RAD*(tst/4 - 180);
+  const latR = CFG.lat*RAD;
+  const cosZ = Math.sin(latR)*Math.sin(t.dec) + Math.cos(latR)*Math.cos(t.dec)*Math.cos(ha);
+  return 90 - Math.acos(Math.max(-1,Math.min(1,cosZ)))/RAD;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   WEBSOCKET TRANSPORT
+   ═══════════════════════════════════════════════════════════════ */
+let ws = null, wsTry = 0, wsTimer = null, histTimer = null, histReqId = 0, msgId = 0;
+/* Every outgoing command needs a unique id — HA rejects a command whose id
+   collides with another in-flight command, which silently killed history. */
+const nextId = () => ++msgId;
+
+function setLive(status, label){
+  $('liveDot').className = 'dot ' + status;
+  $('liveTxt').textContent = label;
+}
+
+function connect(){
+  if(ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  const url = CFG.hass.replace(/^http/,'ws') + '/api/websocket';
+  setLive('warn','connecting');
+  try{ ws = new WebSocket(url); }catch(e){ retry(); return; }
+
+  ws.onopen = () => ws.send(JSON.stringify({type:'auth', access_token:CFG.token}));
+
+  ws.onmessage = ev => {
+    let m; try{ m = JSON.parse(ev.data); }catch(e){ return; }
+    if(m.type === 'auth_required'){
+      ws.send(JSON.stringify({type:'auth', access_token:CFG.token}));
+    } else if(m.type === 'auth_ok'){
+      wsTry = 0;
+      S.connected = true;
+      setLive('live','live');
+      hideBanner();
+      ws.send(JSON.stringify({id:nextId(), type:'subscribe_entities', entity_ids:LIVE_IDS}));
+      fetchHistory();
+      clearInterval(histTimer);
+      histTimer = setInterval(fetchHistory, CFG.histEveryMs);
+    } else if(m.type === 'auth_invalid'){
+      setLive('bad','auth failed');
+      banner('Token rejected','The Home Assistant long-lived token is invalid or expired. Update it on the settings page.');
+      try{ ws.close(); }catch(e){}
+    } else if(m.type === 'result'){
+      if(m.id === histReqId) onHistory(m.result);
+    } else if(m.type === 'event'){
+      const ev2 = m.event;
+      /* Home Assistant's compressed state stream uses three different shapes:
+         "a"  -> full state (initial snapshot, or an entity being added)
+         "c"  -> a DIFF: {entity_id: {"+": {changed fields}, "-": {"a":[removed attrs]}}}
+         "r"  -> [entity_id] removed
+         The diff's "+" only carries the fields that actually changed, so it has
+         to be merged into the state we already hold, not replace it. */
+      if(ev2 && ev2.a) for(const id of Object.keys(ev2.a)) applyState(id, ev2.a[id]);
+      if(ev2 && ev2.c) for(const id of Object.keys(ev2.c)) applyDiff(id, ev2.c[id]);
+      if(ev2 && ev2.r) for(const id of ev2.r) S.live.delete(id);
+      if(ev2 && ev2.event_type === 'state_changed' && ev2.data && ev2.data.new_state)
+        applyState(ev2.data.new_state.entity_id, ev2.data.new_state);
+      S.lastMsg = Date.now();
+    }
+  };
+  ws.onerror = () => {};
+  ws.onclose = () => {
+    S.connected = false;
+    setLive('warn','reconnecting');
+    retry();
+  };
+}
+function retry(){
+  wsTry = Math.min(wsTry+1, 8);
+  const delay = Math.min(600*Math.pow(1.8, wsTry-1), 15000);
+  clearTimeout(wsTimer);
+  wsTimer = setTimeout(connect, delay);
+}
+
+function applyState(id, o){
+  if(!o) return;
+  const s = (o.s !== undefined) ? o.s : o.state;
+  const a = (o.a !== undefined) ? o.a : o.attributes;
+  const prev = S.live.get(id);
+  S.live.set(id, {s, a:a||{}, t:Date.now()});
+  if(prev && prev.s !== s && FLASH[id]) for(const el of FLASH[id]) flashEl(el);
+  scheduleRender();
+}
+
+/* Apply a compressed state DIFF. "+" holds the fields that changed (state
+   and/or attributes); "-" holds attributes that were removed. Anything not
+   mentioned keeps its previous value. */
+function applyDiff(id, diff){
+  if(!diff) return;
+  const add = diff['+'] || {};
+  const rem = diff['-'] || {};
+  const prev = S.live.get(id);
+  const attrs = Object.assign({}, prev ? prev.a : {});
+  if(rem.a) for(const k of rem.a) delete attrs[k];
+  if(add.a) Object.assign(attrs, add.a);
+  const s = (add.s !== undefined) ? add.s : (prev ? prev.s : 'unknown');
+  S.live.set(id, {s, a:attrs, t:Date.now()});
+  if(prev && prev.s !== s && FLASH[id]) for(const el of FLASH[id]) flashEl(el);
+  scheduleRender();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HISTORY  (history/history_during_period over WS — REST is CORS-blocked)
+   ═══════════════════════════════════════════════════════════════ */
+function fetchHistory(){
+  if(!ws || ws.readyState !== WebSocket.OPEN) return;
+  const now = Math.floor(Date.now()/1000);
+  S.dayStart  = localMidnight(now*1000, CFG.tz);
+  S.ydayStart = S.dayStart - 86400;
+  histReqId = nextId();
+  ws.send(JSON.stringify({
+    id: histReqId, type:'history/history_during_period',
+    start_time: new Date(S.ydayStart*1000).toISOString(),
+    end_time:   new Date(now*1000).toISOString(),
+    entity_ids: HIST_IDS,
+    minimal_response:true, no_attributes:true, significant_changes_only:true
+  }));
+}
+
+function onHistory(res){
+  if(!res) return;
+  const pick = k => (res[k]||[]).map(p => ({t: p.lu ?? p.lc, v: parseFloat(p.s)})).filter(p => Number.isFinite(p.v));
+  S.hist.m1  = pick(E.m1Power);
+  S.hist.m2  = pick(E.m2Power);
+  S.hist.soc = pick(E.soc);
+  buildBins();
+  scheduleRender();
+}
+
+/* step-hold lookup: value of a series at time t */
+function at(series, t){
+  if(!series.length) return null;
+  let lo=0, hi=series.length-1, v=null;
+  while(lo<=hi){ const mid=(lo+hi)>>1; if(series[mid].t<=t){ v=series[mid].v; lo=mid+1; } else hi=mid-1; }
+  return v;
+}
+const BIN = 300;                                   // 5-minute bins
+function binsFor(series, t0, t1){
+  const out=[]; const n=Math.ceil((t1-t0)/BIN);
+  for(let i=0;i<n;i++){
+    const te = t0 + (i+1)*BIN;
+    const v = at(series, te);
+    out.push({ t:te, p: Math.max(0, v||0) });
+  }
+  return out;
+}
+function buildBins(){
+  const now = Math.floor(Date.now()/1000);
+  const b1 = binsFor(S.hist.m1, S.dayStart, now);
+  const b2 = binsFor(S.hist.m2, S.dayStart, now);
+  S.bins = b1.map((b,i)=>({ t:b.t, p:b.p + (b2[i]?b2[i].p:0) }));
+  /* yesterday, per array, so the BLE array (which has no yield_yesterday
+     counter) can still be added to the MPPT's own device figure */
+  S.yM1 = binsFor(S.hist.m1, S.ydayStart, S.dayStart);
+  S.yM2 = binsFor(S.hist.m2, S.ydayStart, S.dayStart);
+  S.peak  = S.bins.reduce((m,b)=>Math.max(m,b.p), 0);
+  S.yPeak = S.yM1.reduce((m,b,i)=>Math.max(m,b.p+(S.yM2[i]?S.yM2[i].p:0)), 0);
+  S.pk1 = S.bins.reduce((m,b,i)=>Math.max(m, b1[i]?b1[i].p:0), 0);
+  S.pk2 = S.bins.reduce((m,b,i)=>Math.max(m, b2[i]?b2[i].p:0), 0);
+}
+function integrate(bins){
+  let e=0, prevT=null, prevV=0;
+  for(const b of bins){ if(prevT!==null) e += (b.t-prevT)*prevV/3600; prevT=b.t; prevV=b.p; }
+  return e;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DERIVED VALUES
+   ═══════════════════════════════════════════════════════════════ */
+function derive(){
+  const m1 = num(E.m1Power), m2 = num(E.m2Power);
+  const pv   = Math.max(0,(m1||0)+(m2||0));
+  const batt = num(E.power) ?? 0;          // + charging, - discharging
+  const load = pv - batt;
+  return {m1:m1||0, m2:m2||0, pv, batt, load, soc:num(E.soc)};
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════════ */
+/* Render scheduling.
+   requestAnimationFrame is throttled to zero in a background/hidden tab, which
+   would freeze a wall-mounted display that loses focus. A timer-driven
+   scheduler keeps the dashboard live regardless of window focus. */
+let renderQueued = false;
+function scheduleRender(){
+  if(renderQueued) return;
+  renderQueued = true;
+  setTimeout(()=>{ renderQueued = false; render(); }, 120);
+}
+
+const setTxt = (id,txt) => { const el=$(id); if(!el) return; if(el.textContent!==String(txt)) el.textContent = txt; };
+/* values that carry a <em> unit span need innerHTML, not textContent */
+const setHtml = (id,html) => { const el=$(id); if(!el) return; if(el.innerHTML!==html) el.innerHTML = html; };
+/* energy with a correctly-scaled unit */
+const energy = wh => wh>=1000 ? (wh/1000).toFixed(2)+'<em>kWh</em>' : Math.round(wh)+'<em>Wh</em>';
+function flashEl(id){
+  const el = $(id); if(!el) return;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+
+function render(){ try{ renderAll(); }catch(e){ console.error(e); } }
+
+function renderAll(){
+  const d = derive();
+  const soc = d.soc;
+  const charging = d.batt > 3, discharging = d.batt < -3;
+  const state = charging ? 'chg' : discharging ? 'dis' : 'idle';
+  const now = Date.now();
+
+  /* ── header ── */
+  $('clock').firstChild.nodeValue = new Date(now).toLocaleTimeString('en-GB',{timeZone:CFG.tz});
+  $('cdate').textContent = new Date(now).toLocaleDateString('en-GB',
+    {timeZone:CFG.tz,weekday:'short',day:'numeric',month:'short'}).toUpperCase();
+
+  const elev = sunElevation(now);
+  const up = elev > 0;
+  $('sunDot').className = 'dot ' + (up ? 'live' : '');
+  $('sunTxt').textContent = up ? elev.toFixed(0)+'°' : 'below horizon';
+
+  const alarm = str(E.alarm);
+  const alarmOn = alarm && alarm.toUpperCase() !== 'OFF';
+  $('alrmChip').style.display = alarmOn ? '' : 'none';
+  if(alarmOn) $('alrmTxt').textContent = (str(E.alarmWhy)||'alarm').toUpperCase();
+
+  /* ── battery ── */
+  const C = 2*Math.PI*33;
+  const pct = soc==null ? null : Math.max(0,Math.min(100,soc));
+  $('socArc').setAttribute('stroke-dasharray', C.toFixed(1));
+  $('socArc').setAttribute('stroke-dashoffset', (C*(1-(pct||0)/100)).toFixed(1));
+  $('socArc').style.stroke = charging ? 'var(--batt)' : discharging ? 'var(--load)' : 'var(--solar)';
+  setTxt('socPct', pct==null ? '—' : Math.round(pct));
+
+  const bs = $('bState');
+  bs.className = 'bstate '+state;
+  bs.firstElementChild.textContent = charging ? '▲' : discharging ? '▼' : '•';
+  setTxt('bStateTxt', charging ? 'Charging' : discharging ? 'Discharging' : 'Idle');
+  setTxt('bPow', (d.batt>0?'+':'')+Math.round(d.batt));
+
+  const ttg = num(E.ttg);
+  setTxt('bTtg', ttg==null ? '—' :
+    ttg < 0 ? 'charging · runtime n/a' :
+    ttg >= 1440 ? '~'+(ttg/1440).toFixed(1)+' days at this rate'
+                : '~'+Math.floor(ttg/60)+'h '+(ttg%60)+'m at this rate');
+
+  setTxt('bV',  f1(num(E.volt),2));
+  const cur = num(E.curr);
+  setTxt('bA',  cur==null?'—':(cur>0?'+':'')+cur.toFixed(2));
+  setTxt('bT',  f1(num(E.temp),1));
+  setTxt('bH',  num(E.humid)==null?'—':Math.round(num(E.humid)));
+  const ah = num(E.ah);
+  setTxt('bAh', ah==null?'—':Math.abs(ah).toFixed(1));
+  setTxt('bCy', num(E.cycles)==null?'—':Math.round(num(E.cycles)));
+
+  /* ── mppt 1 ── */
+  setTxt('m1W', Math.round(d.m1));
+  setTxt('m1V',  f1(num(E.m1PV),2));
+  setTxt('m1A',  f1(num(E.m1Cur),2));
+  setTxt('m1BV', f1(num(E.m1BV),2));
+  const m1Td = num(E.m1Yield);
+  setTxt('m1Td', m1Td==null?'—':Math.round(m1Td));
+  const m1Tot = num(E.m1Total);
+  setTxt('m1Lt', m1Tot==null?'—':(m1Tot/1000).toFixed(1));
+  setTxt('m1Pk', S.pk1 ? Math.round(S.pk1) : '—');
+  const sn = str(E.m1SN);
+  const m1Track = str(E.m1Track) || '—';
+  setHtml('m1Soc', (sn ? 'SN '+sn.slice(-6) : 'SN —') + '<br>' + m1Track.toLowerCase());
+  setMode('m1Mode', str(E.m1Mode), str(E.m1Error));
+  const m1Err = str(E.m1Error);
+  const m1Bad = m1Err && m1Err.toLowerCase() !== 'no error';
+  if(m1Bad) setMode('m1Mode', 'ERROR', m1Err);
+
+  /* ── mppt 2 ── */
+  setTxt('m2W', Math.round(d.m2));
+  setTxt('m2BV', f1(num(E.m2BV),2));
+  setTxt('m2A',  f1(num(E.m2Cur),2));
+  const m2Td = num(E.m2Yield);
+  setTxt('m2Td', m2Td==null?'—':Math.round(m2Td*1000));
+  const m2Tot = num(E.m2Total);
+  setTxt('m2Lt', m2Tot==null?'—':m2Tot.toFixed(2));
+  setTxt('m2Pk', S.pk2 ? Math.round(S.pk2) : '—');
+  setMode('m2Mode', str(E.m2Mode), str(E.m2Error));
+  const m2Fault = str(E.m2Fault)==='on', m2He = str(E.m2HasErr)==='on';
+  const m2Why = (str(E.m2Error)||'').trim();
+  const m2Bad = m2Fault || m2He || (m2Why && m2Why.toLowerCase()!=='no error');
+  /* no status line on these cards — a fault turns the mode badge red */
+  setMode('m2Mode', m2Bad ? 'FAULT' : str(E.m2Mode), m2Bad ? (m2Why||'error') : str(E.m2Error));
+  const fw = str(E.m2Fw);
+  const fwEl = $('m2Fw');
+  if(fwEl){
+    if(fw === 'on'){ fwEl.textContent = 'update'; fwEl.className = 'v warn'; }
+    else if(fw === 'off'){ fwEl.textContent = 'up to date'; fwEl.className = 'v'; }
+    else { fwEl.textContent = fw ? fw : '—'; fwEl.className = 'v'; }
+  }
+
+  /* ── hero ── */
+  setTxt('pvNow', Math.round(d.pv));
+  setTxt('spM1', Math.round(d.m1)+' W');
+  setTxt('spM2', Math.round(d.m2)+' W');
+  const peakNow = Math.max(S.peak, d.pv);
+  setTxt('hPeak', Math.round(peakNow));
+  const todayWh = (m1Td||0) + (m2Td||0)*1000;
+  setHtml('hToday', energy(todayWh));
+  setTxt('hSun', elev.toFixed(0));
+
+  /* ── footer ── */
+  setHtml('fToday', energy(todayWh));
+  /* Yesterday: the MPPT's own yield_yesterday counter (device-accurate) plus
+     the BLE array's history-integrated yield, since the BLE integration
+     exposes no yesterday counter. */
+  const yM1 = num(E.m1Yest);
+  const yM2 = S.yM2.length ? integrate(S.yM2) : 0;
+  const yestWh = (yM1!=null ? yM1 : (S.yM1.length ? integrate(S.yM1) : 0)) + yM2;
+  setHtml('fYest', (yM1!=null || S.yM1.length) ? energy(yestWh) : '—');
+  const lifeKwh = (m1Tot||0)/1000 + (m2Tot||0);
+  setHtml('fLife', lifeKwh.toFixed(1)+'<em>kWh</em>');
+  const enIn = num(E.chgEnergy), enOut = num(E.disEnergy);
+  setHtml('fIn',  enIn==null?'—':enIn.toFixed(1)+'<em>kWh</em>');
+  setHtml('fOut', enOut==null?'—':enOut.toFixed(1)+'<em>kWh</em>');
+  setTxt('fFd', num(E.fulldisc)==null?'—':Math.round(num(E.fulldisc)));
+  const mn = num(E.minV), mx = num(E.maxV);
+  setHtml('fVr', (mn==null||mx==null)?'—':mn.toFixed(1)+'–'+mx.toFixed(1)+'<em>V</em>');
+  const lf = num(E.lastFull);
+  setHtml('fLfc', lf==null?'—':(lf/1440).toFixed(1)+'<em>d</em>');
+  const age = S.lastMsg ? Math.round((Date.now()-S.lastMsg)/1000) : null;
+  setTxt('fUpd', age==null?'—':(age<3?'now':age+'s'));
+
+  drawCurve(d);
+  drawFlow(d);
+  drawSocSpark();
+}
+
+function setMode(id, mode, err){
+  const el = $(id); if(!el) return;
+  const m = (mode||'').toLowerCase();
+  let cls = 'off';
+  if(m.includes('bulk')||m.includes('equal')) cls = 'bulk';
+  else if(m.includes('absorb')) cls = 'absorb';
+  else if(m.includes('float')) cls = 'float';
+  if(err && err.toLowerCase()!=='no error') cls = 'err';
+  el.className = 'mode '+cls;
+  el.textContent = (mode || '—').toUpperCase();
+}
+function f1(v, dp){ return v==null ? '—' : v.toFixed(dp); }
+
+/* ── today's PV curve (area chart) ─────────────────────── */
+/* plot area inside the 408×142 viewBox. The right edge stops at 400 so the
+   centred "24" axis label still fits inside the viewBox (a centred label
+   overhangs its anchor by ~4 units, which would shave the "4" at 404). */
+const CX0=34, CX1=400, CY0=10, CY1=118;
+function drawCurve(d){
+  const bins = S.bins;
+  if(!bins.length) return;
+  const st = sunTimes(Date.now());
+
+  /* y scale: nice round maximum */
+  const raw = Math.max(S.peak, d.pv, 20);
+  const step = raw<=60?20:raw<=150?50:raw<=400?100:raw<=800?200:500;
+  const yMax = Math.ceil(raw/step)*step;
+
+  const X = t => CX0 + ((t - S.dayStart)/86400)*(CX1-CX0);
+  const Y = p => CY1 - (Math.min(p,yMax)/yMax)*(CY1-CY0);
+
+  /* night shading + grid + axis (built once per scale/day) */
+  const key = S.dayStart+'-'+yMax;
+  if($('cGrid').dataset.key !== key){
+    $('cGrid').dataset.key = key;
+    let g='';
+    for(let i=0;i<=2;i++){
+      const y = CY1 - (i/2)*(CY1-CY0);
+      g += `<line x1="${CX0}" y1="${y.toFixed(1)}" x2="${CX1}" y2="${y.toFixed(1)}" stroke="#1b2634" stroke-width="1"/>`;
+      g += `<text x="${CX0-5}" y="${(y+3).toFixed(1)}" fill="#4d5c70" font-size="7.5" text-anchor="end">${Math.round(yMax*i/2)}</text>`;
+    }
+    for(let h=0; h<=24; h+=6){
+      const x = CX0 + (h/24)*(CX1-CX0);
+      g += `<line x1="${x.toFixed(1)}" y1="${CY0}" x2="${x.toFixed(1)}" y2="${CY1}" stroke="#1b2634" stroke-width="1"/>`;
+      g += `<text x="${x.toFixed(1)}" y="${CY1+13}" fill="#4d5c70" font-size="7.5" text-anchor="middle">${String(h).padStart(2,'0')}</text>`;
+    }
+    g += `<text x="${CX0-5}" y="${CY0-1}" fill="#4d5c70" font-size="7" text-anchor="end">W</text>`;
+    $('cGrid').innerHTML = g;
+
+    /* night regions (before sunrise / after sunset) */
+    let n='';
+    const rx = Math.max(CX0, Math.min(CX1, X(st.rise)));
+    const sx = Math.max(CX0, Math.min(CX1, X(st.set)));
+    if(rx>CX0) n += `<rect x="${CX0}" y="${CY0}" width="${(rx-CX0).toFixed(1)}" height="${CY1-CY0}" fill="#0a1018" opacity=".55"/>`;
+    if(sx<CX1) n += `<rect x="${sx.toFixed(1)}" y="${CY0}" width="${(CX1-sx).toFixed(1)}" height="${CY1-CY0}" fill="#0a1018" opacity=".55"/>`;
+    /* sunrise / sunset markers */
+    n += `<line x1="${rx.toFixed(1)}" y1="${CY0}" x2="${rx.toFixed(1)}" y2="${CY1}" stroke="#f0b429" stroke-width="1" opacity=".35"/>`;
+    n += `<line x1="${sx.toFixed(1)}" y1="${CY0}" x2="${sx.toFixed(1)}" y2="${CY1}" stroke="#e07b3a" stroke-width="1" opacity=".35"/>`;
+    $('cNight').innerHTML = n;
+  }
+
+  /* area + line, with the live value folded into the final bin */
+  const pts = bins.map(b=>({x:X(b.t), y:Y(b.p)}));
+  if(pts.length){
+    const last = pts[pts.length-1];
+    last.y = Y(d.pv);
+  }
+  let line='', area='';
+  if(pts.length){
+    line = 'M'+pts[0].x.toFixed(1)+','+pts[0].y.toFixed(1);
+    for(let i=1;i<pts.length;i++) line += 'L'+pts[i].x.toFixed(1)+','+pts[i].y.toFixed(1);
+    area = line + `L${pts[pts.length-1].x.toFixed(1)},${CY1}L${pts[0].x.toFixed(1)},${CY1}Z`;
+  }
+  $('cLine').setAttribute('d', line);
+  $('cArea').setAttribute('d', area);
+
+  /* peak marker */
+  let pk=null;
+  for(const b of bins) if(!pk || b.p>pk.p) pk=b;
+  if(pk && pk.p>0){
+    const px = X(pk.t), py = Y(pk.p);
+    $('cPeakMark').innerHTML =
+      `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2.6" fill="#ffd98a"/>`;
+  } else $('cPeakMark').innerHTML = '';
+
+  /* now marker */
+  const nowT = Date.now()/1000;
+  const nx = X(Math.min(nowT, S.dayStart+86400));
+  const ny = Y(d.pv);
+  $('cNowLine').setAttribute('x1', nx.toFixed(1)); $('cNowLine').setAttribute('x2', nx.toFixed(1));
+  $('cNowLine').setAttribute('y1', CY0); $('cNowLine').setAttribute('y2', CY1);
+  $('cNowDot').setAttribute('cx', nx.toFixed(1)); $('cNowDot').setAttribute('cy', ny.toFixed(1));
+  $('cNowDot').setAttribute('opacity', d.pv>0.5 ? 1 : 0);
+  $('cNowGlow').setAttribute('cx', nx.toFixed(1)); $('cNowGlow').setAttribute('cy', ny.toFixed(1));
+  $('cNowGlow').setAttribute('opacity', d.pv>0.5 ? .85 : 0);
+}
+
+/* ── power flow ───────────────────────────────────────── */
+function drawFlow(d){
+  const nodes = [
+    {x:68,  c:'#f7b23b', icon:'iSun',  lab:'PV ARRAY', val:Math.round(d.pv)+' W', sub:'2 × MPPT'},
+    {x:205, c: d.batt>=0?'#3ddc84':'#38bdf8', icon:'iBatt', lab:'BATTERY',
+      val:(d.batt>0?'+':'')+Math.round(d.batt)+' W', sub: d.batt>3?'charging':d.batt<-3?'discharging':'idle'},
+    {x:342, c:'#38bdf8', icon:'iHome', lab:'LOAD', val:Math.round(d.load)+' W', sub:'off-grid'},
+  ];
+  let n='';
+  for(const nd of nodes){
+    n += `<g>
+      <circle cx="${nd.x}" cy="40" r="24" fill="#111a26" stroke="${nd.c}" stroke-width="1.4"/>
+      <circle cx="${nd.x}" cy="40" r="24" fill="${nd.c}" opacity=".07"/>
+      <use href="#${nd.icon}" x="${nd.x-10}" y="30" width="20" height="20" style="color:${nd.c}"/>
+      <text class="flab" x="${nd.x}" y="77.5" text-anchor="middle">${nd.lab}</text>
+      <text class="fval" x="${nd.x}" y="93" text-anchor="middle" fill="${nd.c}">${nd.val}</text>
+      <text class="fsub" x="${nd.x}" y="101" text-anchor="middle">${nd.sub}</text>
+    </g>`;
+  }
+  $('flowNodes').innerHTML = n;
+
+  const seg = (x1,x2,on,col,marker) =>
+    `<line x1="${x1}" y1="40" x2="${x2}" y2="40" stroke="${col}" stroke-width="${on?3:1.5}"
+      opacity="${on?1:.2}" ${on?'stroke-dasharray="7 6"':'stroke-dasharray="3 5"'} marker-end="url(#${marker})">
+      ${on?'<animate attributeName="stroke-dashoffset" from="26" to="0" dur="1.1s" repeatCount="indefinite"/>':''}
+    </line>`;
+  $('flowArrows').innerHTML = seg(96,176, d.batt>3, '#f7b23b', 'arrS')
+                            + seg(234,314, d.load>0.5, '#38bdf8', 'arrL');
+}
+
+/* ── SoC sparkline ───────────────────────────────────── */
+function drawSocSpark(){
+  const s = S.hist.soc.filter(p=>p.t>=S.dayStart);
+  if(s.length<2) return;
+  const svg = $('socLine').ownerSVGElement;
+  const vb = (svg.getAttribute('viewBox')||'0 0 300 25').split(' ').map(Number);
+  const W = vb[2], H = vb[3];
+  let d='', first=true, area='';
+  for(const p of s){
+    const x = ((p.t - S.dayStart)/86400)*W;
+    const y = H - (Math.max(0,Math.min(100,p.v))/100)*H;
+    d += (first?'M':'L')+x.toFixed(1)+','+y.toFixed(1); first=false;
+  }
+  area = d + `L${W},${H}L0,${H}Z`;
+  $('socArea').setAttribute('d', area);
+  $('socLine').setAttribute('d', d);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MISC
+   ═══════════════════════════════════════════════════════════════ */
+function banner(t,m){ $('bnT').textContent=t; $('bnM').textContent=m||''; $('banner').classList.add('on'); }
+function hideBanner(){ $('banner').classList.remove('on'); }
+function fitStage(){
+  const s = Math.min(innerWidth/800, innerHeight/480);
+  $('stage').style.transform = `translate(${(innerWidth-800*s)/2}px, ${(innerHeight-480*s)/2}px) scale(${s})`;
+}
+addEventListener('resize', fitStage);
+fitStage();
+
+setInterval(()=>{ scheduleRender(); }, 1000);
+/* the banner is cleared by hideBanner() once the socket authenticates;
+   it deliberately stays up otherwise so a wall display shows the fault */
+
+connect();
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+# The build context should be the code, not the whole working tree.
+#
+# Most important: the settings file holds the Home Assistant long-lived
+# access token. It is mounted into the container at run time and must
+# never be copied into an image, where it would sit in a layer forever.
+config.json
+config/
+.env
+
+# Version control and Python bits.
+.git
+.gitignore
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# The tests and the notes are not part of the server.
+tests/
+docs/
+*.md
+
+# Editor and OS noise.
+.DS_Store
+.idea/
+.vscode/
+*.swp
