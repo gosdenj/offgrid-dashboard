@@ -150,3 +150,40 @@ and the rendered values are sampled, so "the numbers actually move" is asserted,
 
 Runs from `file://` as well as over HTTP: the Home Assistant WebSocket API accepts an
 `Origin: null` request, which is what `file://` sends.
+
+## Putting it in a container
+
+The dashboard was a file on a disk. It is now a container, and the change is small but not
+trivial, because of one thing: **the token was in the file**.
+
+The file carried the Home Assistant address, the long-lived access token and the site's
+coordinates, in plain text, in a repository that is public. So:
+
+- the token, the address and the coordinates moved into a **named Docker volume**, as
+  `config.json`, written with `0600`;
+- the container **serves** the dashboard and **injects** the settings into it per request,
+  between two markers in the file, so a change to the settings is live on the next reload and
+  needs no restart;
+- the file in the repository now has empty defaults, and a test fails the build if anything
+  that looks like an access token is committed.
+
+The dashboard still talks to Home Assistant **from the browser** — the server never sees the
+readings. That is deliberate: Home Assistant's REST API refuses a browser outright, and its
+WebSocket API does not, so there is nothing for a backend to do. The cost is that the token
+travels to the browser, which means the page carries it. The same bargain the other dashboards
+in this family make, and the reason the port belongs on the LAN.
+
+Two things the container needed that the file did not:
+
+- **Graceful shutdown.** `httpd.shutdown()` waits for `serve_forever()` to stop, so it cannot
+  be called from the thread that is running it — which is the thread the signal handler runs
+  on. It is called from a separate thread instead. A container that ignores SIGTERM makes
+  Docker wait out its whole stop timeout on every redeploy.
+- **A precise "not set up" message.** An empty token is not the same fault as a token that was
+  refused, and a panel that cannot tell them apart sends the reader off to look for a token
+  problem that does not exist.
+
+The layout was not touched — the only edits to the file were the config block and two
+messages — but the browser tests re-check it anyway, against a stub Home Assistant that
+speaks the real WebSocket protocol, so "nothing spills outside the panel" is asserted rather
+than assumed.

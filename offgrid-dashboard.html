@@ -549,6 +549,14 @@ function setLive(status, label){
 
 function connect(){
   if(ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  /* No token is not the same fault as a token that was refused.  Say which
+     one it is, or the first thing anybody sees is "your token expired" on a
+     dashboard that simply has not been set up yet. */
+  if(!CFG.hass || !CFG.token){
+    setLive('warn','not set up');
+    banner('Not set up','There is no Home Assistant address and token yet. Add them on the settings page.');
+    return;
+  }
   const url = CFG.hass.replace(/^http/,'ws') + '/api/websocket';
   setLive('warn','connecting');
   try{ ws = new WebSocket(url); }catch(e){ retry(); return; }

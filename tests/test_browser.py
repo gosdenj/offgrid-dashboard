@@ -261,5 +261,51 @@ class TestTheDashboardInABrowser(unittest.TestCase):
         self.assertEqual(self.messages, [])
 
 
+@unittest.skipIf(sync_playwright is None, "playwright is not installed")
+class TestTheDashboardWithNoSettings(unittest.TestCase):
+    """A dashboard with nothing configured says so.
+
+    "Not set up" and "your token was refused" are different faults, and a
+    wall panel that cannot tell them apart sends the reader off to look
+    for a token problem that does not exist.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        import tempfile
+
+        cls.directory = tempfile.TemporaryDirectory()
+        cls.config = server.Config(Path(cls.directory.name) / "config.json")
+        cls.httpd, cls.port = start_dashboard_server(cls.config)
+        cls.playwright = sync_playwright().start()
+        cls.browser = cls.playwright.chromium.launch()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.browser.close()
+        cls.playwright.stop()
+        stop_dashboard_server(cls.httpd)
+        cls.directory.cleanup()
+
+    def test_it_says_it_is_not_set_up_and_points_at_the_settings(self) -> None:
+        page = self.browser.new_page(viewport={"width": 800, "height": 480})
+        try:
+            page.goto(f"http://127.0.0.1:{self.port}/")
+            page.wait_for_function(
+                "() => document.querySelector('#bnT').textContent.trim() === 'Not set up'",
+                timeout=10000,
+            )
+            self.assertIn(
+                "settings page",
+                (page.query_selector("#bnM").text_content() or ""),
+            )
+            self.assertEqual(
+                (page.query_selector("#liveTxt").text_content() or "").strip(),
+                "not set up",
+            )
+        finally:
+            page.close()
+
+
 if __name__ == "__main__":
     unittest.main()
