@@ -231,7 +231,10 @@ and turning it would mean turning the tablet.
 - The hint that tells you to turn the device goes **in the space below the panel**, and it is
   not shown at all when there is no room for it. A window whose proportions match the
   panel's — 360×600 — leaves the turned panel filling the whole height, and a hint placed
-  there would sit on top of the panel.
+  there would sit on top of the panel. The offset is the trap: the turned panel's box ends
+  exactly at the bottom of the space it was given, so `bottom: gap` puts the hint *on* the
+  panel's last column rather than under it. The hint's own height has to be measured and
+  subtracted — and a screenshot, not a number, is what caught it.
 
 **How the 7 inch screen was protected.** The change was checked against a capture of the
 panel taken before it, with the clock frozen and a stub Home Assistant for the data. The

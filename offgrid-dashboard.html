@@ -1091,14 +1091,21 @@ function fitStage(){
     st.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
   }
 
-  /* The hint goes in the space below the panel, and only if there is
-     room for it - on a screen whose proportions match the panel's, the
-     turned panel fills the height and there is nowhere to put it. */
+  /* The hint goes in the space below the panel - immediately under it,
+     not over it - and only if there is room for it.  On a screen whose
+     proportions match the panel's the turned panel fills the height,
+     and there is nowhere to put it, so it is not shown at all. */
   document.body.classList.toggle('turned', turned);
   const hint = $('turnHint');
-  if(turned && gap >= 34){
-    hint.style.bottom = gap + 'px';
+  if(turned){
+    /* let it lay out first, so that its height is known */
     hint.style.display = '';
+    const h = hint.offsetHeight;
+    if(gap >= h + 6){
+      hint.style.bottom = (gap - h) + 'px';
+    } else {
+      hint.style.display = 'none';
+    }
   } else {
     hint.style.display = 'none';
   }

@@ -465,6 +465,32 @@ class TestThePanelFitsTheWindow(unittest.TestCase):
         finally:
             page.close()
 
+    def test_the_hint_is_below_the_panel_and_not_over_it(self) -> None:
+        """The hint belongs in the space under the panel.
+
+        The turned panel reaches the bottom of the space it is given, so
+        a hint placed at the wrong offset lands on the footer's last
+        column instead of under it.
+        """
+        page = self.at(390, 844)
+        try:
+            m = page.evaluate(
+                """() => {
+                  const hint = document.querySelector('#turnHint');
+                  const hr = hint.getBoundingClientRect();
+                  const pr = document.querySelector('#stage').getBoundingClientRect();
+                  return {shown: hr.height > 0, top: hr.top, bottom: hr.bottom,
+                          panelBottom: pr.bottom};
+                }"""
+            )
+            self.assertTrue(m["shown"])
+            self.assertGreaterEqual(
+                m["top"], m["panelBottom"] - 1, "the hint is over the panel"
+            )
+            self.assertLessEqual(m["bottom"], 844)
+        finally:
+            page.close()
+
     def test_the_hint_is_not_shown_when_there_is_no_room_for_it(self) -> None:
         """A window whose proportions match the panel's leaves no space.
 
