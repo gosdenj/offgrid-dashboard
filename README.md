@@ -57,6 +57,28 @@ The settings page writes a JSON file into the volume. Changing the token
 there does not need a redeploy - the page is rendered per request, so the
 next reload of the dashboard has the new settings.
 
+## The screen
+
+The wall panel is a browser and an address:
+
+```
+http://<target-ip>:8767/
+```
+
+The panel is fixed at 800×480 — the size of the 7 inch screen it was made
+for — and the page scales itself to fit whatever window it is in.
+
+| The window | What happens |
+|---|---|
+| Exactly 800×480 | Nothing at all. The scale is 1 and the panel is not moved, so the 7 inch screen is untouched. |
+| Wider than 800×480 | The panel is scaled up to fill the window. A desktop gets the whole screen. |
+| A phone, held sideways | The panel is scaled to the height of the window, as large as it can be without cropping. |
+| A phone, held upright | The panel is turned sideways, so it sits on the long axis of the screen instead of being an unreadable strip in the middle of it. The numbers are the same size either way — turn the device and the panel is the right way up. |
+| A portrait tablet | Left upright. It is big enough to read that way, and turning it would mean turning the tablet. |
+
+The background is on the page rather than on the panel, so there is no
+visible edge where the panel stops and the window carries on.
+
 ## Running it locally
 
 No container needed:

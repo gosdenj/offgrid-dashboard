@@ -267,7 +267,10 @@ http://<target-ip>:8767/
 ```
 
 The panel is fixed at 800×480, and the page scales itself to fit whatever
-screen it is on.
+screen it is on. On the 7 inch screen it is a scale of exactly 1 and
+nothing moves. On a desktop it scales up to fill the window, and on a
+phone it turns sideways when the phone is held upright, so the numbers
+are readable either way.
 
 ## The catch
 

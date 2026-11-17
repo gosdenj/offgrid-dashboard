@@ -187,3 +187,55 @@ The layout was not touched — the only edits to the file were the config block 
 messages — but the browser tests re-check it anyway, against a stub Home Assistant that
 speaks the real WebSocket protocol, so "nothing spills outside the panel" is asserted rather
 than assumed.
+
+## The panel is a fixed 800×480, and everything else is a fit
+
+The dashboard is a panel for a 7 inch Raspberry Pi screen: 800×480, landscape, fixed. The
+page scales it to fit the window, which is right for a wall display and wrong for everything
+else — so two things were wrong, and they were different faults.
+
+**The margin showed the edge of the panel.** The gradient was on `#stage`, and the stage is
+800×480 inside a window that usually is not. So on a desktop the dashboard had a visible
+rectangular edge at 60 px in, and looked like a picture in a frame. The fix is to put the
+gradient on the **page** and leave the stage transparent: one wash over the whole window,
+with no edge to see. At 800×480 the page and the stage are the same box, so the panel looks
+exactly as it did — which is the only thing that mattered.
+
+**A phone held upright got a strip.** Fitted the obvious way, a 390×844 phone got a
+390×234 panel in the middle of the screen: 27.7 % of it covered, and the title rendered at
+7 px. The panel is landscape, so fitting it into a portrait screen by width is always going
+to be bad.
+
+The fix is to turn it sideways, which puts it on the **long axis** of the screen:
+
+| | before | after |
+|---|---|---|
+| phone portrait, 390×844 | 390×234, 27.7 % covered | 390×650, **77 %** covered |
+| phone portrait, 360×640 | 360×216, 33.8 % covered | 360×600, **93.8 %** covered |
+
+The numbers come out the same size they would be with the device held sideways — 0.8125 in
+both cases — so turning the device gives the same panel the right way up, and the portrait
+view is not a worse version of it, it is the same panel.
+
+The turn only happens when the upright fit would be **too small to read**, below a scale of
+0.75. Above that the panel is left alone: a portrait tablet at 768×1024 fits upright at 0.96,
+and turning it would mean turning the tablet.
+
+**Two details that are easy to get wrong:**
+
+- The rotation is `translate(tx,ty) rotate(90deg) scale(s)`, and CSS applies those
+  right-to-left — the scale first, then the rotation, then the translation. With the stage's
+  transform-origin at 0 0, the rotated box is `x ∈ [tx − 480s, tx]`, `y ∈ [ty, ty + 800s]`,
+  so centring it is `tx = (vw + 480s)/2` and `ty = (vh − 800s)/2`. Those are not the same
+  formulae as the upright case, and getting them wrong puts the panel off the screen.
+- The hint that tells you to turn the device goes **in the space below the panel**, and it is
+  not shown at all when there is no room for it. A window whose proportions match the
+  panel's — 360×600 — leaves the turned panel filling the whole height, and a hint placed
+  there would sit on top of the panel.
+
+**How the 7 inch screen was protected.** The change was checked against a capture of the
+panel taken before it, with the clock frozen and a stub Home Assistant for the data. The
+geometry of all **144 elements** is identical afterwards, and the pixels that differ (251 of
+384 000) are the same scattered dithering noise that two captures of the *unchanged* panel
+differ by (233). The browser tests now assert that the matrix at 800×480 is the identity
+and that the panel is at (0, 0) at 800×480 — so if it ever moves, the build stops.

@@ -262,6 +262,225 @@ class TestTheDashboardInABrowser(unittest.TestCase):
 
 
 @unittest.skipIf(sync_playwright is None, "playwright is not installed")
+class TestThePanelFitsTheWindow(unittest.TestCase):
+    """The panel is a fixed 800x480 that is scaled to fit the window.
+
+    The 7 inch screen it was made for must not change at all.  Every
+    other window is a case of fitting a fixed panel into a box that is
+    not its shape, and the two awkward cases are a wide desktop and a
+    phone held upright.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.stub = StubHomeAssistant(token=TOKEN, states=STATES, history=history())
+        cls.stub_thread = StubThread(cls.stub)
+        cls.stub_port = cls.stub_thread.start()
+
+        import tempfile
+
+        cls.directory = tempfile.TemporaryDirectory()
+        cls.config = server.Config(Path(cls.directory.name) / "config.json")
+        cls.config.save(
+            {
+                "hass": f"http://127.0.0.1:{cls.stub_port}",
+                "token": TOKEN,
+                "lat": 50.5,
+                "lon": -1.5,
+                "tz": "Europe/London",
+                "histEveryMs": 600000,
+            }
+        )
+        cls.httpd, cls.port = start_dashboard_server(cls.config)
+        cls.playwright = sync_playwright().start()
+        cls.browser = cls.playwright.chromium.launch()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.browser.close()
+        cls.playwright.stop()
+        stop_dashboard_server(cls.httpd)
+        cls.directory.cleanup()
+        cls.stub_thread.stop()
+
+    # ── the plumbing ────────────────────────────────────────────────
+
+    def at(self, width: int, height: int):
+        """Open the panel in a window of the given size."""
+        page = self.browser.new_page(
+            viewport={"width": width, "height": height}, device_scale_factor=1
+        )
+        page.goto(f"http://127.0.0.1:{self.port}/")
+        page.wait_for_timeout(700)
+        return page
+
+    def measure(self, page) -> dict:
+        return page.evaluate(
+            """() => {
+              const st = document.querySelector('#stage');
+              const t = getComputedStyle(st).transform;
+              const m = t.match(/matrix\\(([^)]+)\\)/);
+              const v = m ? m[1].split(',').map(Number) : [1,0,0,1,0,0];
+              const r = st.getBoundingClientRect();
+              const hint = document.querySelector('#turnHint');
+              return {
+                matrix: v,
+                scale: +Math.hypot(v[0], v[1]).toFixed(4),
+                turned: +Math.abs(v[1]).toFixed(4) > 0.001,
+                x: +r.x.toFixed(2), y: +r.y.toFixed(2),
+                w: +r.width.toFixed(2), h: +r.height.toFixed(2),
+                stageBg: getComputedStyle(st).backgroundImage,
+                bodyBg: getComputedStyle(document.body).backgroundImage,
+                hintShown: hint.getBoundingClientRect().height > 0,
+              };
+            }"""
+        )
+
+    # ── the tests ───────────────────────────────────────────────────
+
+    def test_the_7_inch_screen_is_not_changed_at_all(self) -> None:
+        """The screen the panel was made for must be left exactly as it is.
+
+        Not scaled, not moved, not a pixel: the matrix is the identity
+        and the panel is at the top left of the window.
+        """
+        page = self.at(800, 480)
+        try:
+            m = self.measure(page)
+            self.assertEqual(m["matrix"], [1, 0, 0, 1, 0, 0])
+            self.assertEqual((m["x"], m["y"], m["w"], m["h"]), (0, 0, 800, 480))
+            self.assertEqual(m["scale"], 1)
+            self.assertFalse(m["turned"])
+        finally:
+            page.close()
+
+    def test_a_wide_window_scales_the_panel_up_to_fill_it(self) -> None:
+        page = self.at(1920, 1080)
+        try:
+            m = self.measure(page)
+            self.assertEqual(m["scale"], 2.25)
+            self.assertEqual((m["w"], m["h"]), (1800, 1080))
+            self.assertFalse(m["turned"])
+        finally:
+            page.close()
+
+    def test_a_phone_held_upright_turns_the_panel_sideways(self) -> None:
+        """Fitted the obvious way, the panel is a strip too small to read.
+
+        Turned, it is the size it would be with the device held
+        sideways - and it uses the long axis of the screen instead of
+        leaving most of it empty.
+        """
+        page = self.at(390, 844)
+        try:
+            m = self.measure(page)
+            self.assertTrue(m["turned"])
+            self.assertEqual(m["scale"], 0.8125)
+            self.assertEqual((m["w"], m["h"]), (390, 650))
+            # the same size as the same phone held sideways
+            self.assertEqual(m["scale"], self.measure(self.at(844, 390))["scale"])
+        finally:
+            page.close()
+
+    def test_a_phone_held_sideways_is_left_the_right_way_up(self) -> None:
+        page = self.at(844, 390)
+        try:
+            m = self.measure(page)
+            self.assertFalse(m["turned"])
+            self.assertEqual(m["scale"], 0.8125)
+            self.assertEqual((m["w"], m["h"]), (650, 390))
+            self.assertFalse(m["hintShown"])
+        finally:
+            page.close()
+
+    def test_a_portrait_tablet_is_left_upright(self) -> None:
+        """It is big enough to read upright, so it is not turned.
+
+        Turning it would mean turning the tablet.
+        """
+        page = self.at(768, 1024)
+        try:
+            m = self.measure(page)
+            self.assertFalse(m["turned"])
+            self.assertEqual(m["scale"], 0.96)
+            self.assertEqual(m["w"], 768)
+            self.assertAlmostEqual(m["h"], 460.8, places=1)
+        finally:
+            page.close()
+
+    def test_the_background_is_on_the_page_not_on_the_panel(self) -> None:
+        """A gradient on the panel shows its edges in the margin.
+
+        The margin is there on every window that is not exactly 800x480,
+        so the gradient belongs to the page and the panel is transparent.
+        """
+        page = self.at(1920, 1080)
+        try:
+            m = self.measure(page)
+            self.assertEqual(m["stageBg"], "none")
+            self.assertIn("radial-gradient", m["bodyBg"])
+        finally:
+            page.close()
+
+    def test_nothing_spills_outside_the_panel_at_any_size(self) -> None:
+        for width, height in [
+            (800, 480), (1920, 1080), (390, 844), (844, 390), (768, 1024), (360, 640),
+        ]:
+            with self.subTest(size=f"{width}x{height}"):
+                page = self.at(width, height)
+                try:
+                    findings = page.evaluate(
+                        """() => {
+                          const findings = [];
+                          const stage = document.querySelector('#stage');
+                          const box = stage.getBoundingClientRect();
+                          const isSvg = el => el.namespaceURI === 'http://www.w3.org/2000/svg';
+                          for (const el of stage.querySelectorAll('*')) {
+                            if (isSvg(el) && isSvg(el.parentElement)) continue;
+                            const r = el.getBoundingClientRect();
+                            if (r.width === 0 && r.height === 0) continue;
+                            if (r.right > box.right + 1 || r.bottom > box.bottom + 1 ||
+                                r.left < box.left - 1 || r.top < box.top - 1) {
+                              findings.push((el.id || el.className || el.tagName) +
+                                            ' is outside the panel');
+                            }
+                          }
+                          return findings;
+                        }"""
+                    )
+                    self.assertEqual(findings, [], f"{width}x{height}")
+                finally:
+                    page.close()
+
+    def test_the_hint_only_appears_when_the_panel_is_turned(self) -> None:
+        page = self.at(390, 844)
+        try:
+            self.assertTrue(self.measure(page)["hintShown"])
+        finally:
+            page.close()
+
+        page = self.at(844, 390)
+        try:
+            self.assertFalse(self.measure(page)["hintShown"])
+        finally:
+            page.close()
+
+    def test_the_hint_is_not_shown_when_there_is_no_room_for_it(self) -> None:
+        """A window whose proportions match the panel's leaves no space.
+
+        There is nowhere to put the hint, so it is not shown at all -
+        rather than put over the panel.
+        """
+        page = self.at(360, 600)
+        try:
+            m = self.measure(page)
+            self.assertTrue(m["turned"])
+            self.assertFalse(m["hintShown"])
+        finally:
+            page.close()
+
+
+@unittest.skipIf(sync_playwright is None, "playwright is not installed")
 class TestTheDashboardWithNoSettings(unittest.TestCase):
     """A dashboard with nothing configured says so.
 
